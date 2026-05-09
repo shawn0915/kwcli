@@ -359,15 +359,16 @@ KWCLI 采用组件化架构设计：
 
 ![](https://github.com/KWDB/.github/raw/main/profile/logo.png)
 
-# ☕ 捐赠支持
+## ☕ 捐赠支持
 
 如果 kwcli 对你有所帮助，欢迎支持项目持续迭代。点击下面文章链接，文末【稀罕作者】
 
+- [KaiwuDB开源工具kwcli v0.1.1更新](https://mp.weixin.qq.com/s/v5eDgOmFaOeIgxdrXrYQhg)
 - [kwcli：开源一个 KaiwuDB 社区版的 CLI 工具](https://mp.weixin.qq.com/s/od7h4yy7tzTFIv11wcjY0w)
 
 > 捐赠后欢迎留下你的昵称和 Github 链接，我将记录到项目 README 里。 ❤️
 
-# ⭐ Star History
+## ⭐ Star History
 
 如果 kwcli 对你有帮助，欢迎点一个 Star ⭐
 
