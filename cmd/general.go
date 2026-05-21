@@ -89,6 +89,18 @@ func init() {
 
 	installCmd.Flags().StringVar(&globalSource, "source", "auto", "Repository source: auto (use global config), github, atomgit")
 	updateCmd.Flags().StringVar(&globalSource, "source", "auto", "Repository source: auto (use global config), github, atomgit")
+
+	// Dynamic completion for component names
+	installCmd.ValidArgsFunction = componentCompletionFunc
+	updateCmd.ValidArgsFunction = componentCompletionFunc
+	uninstallCmd.ValidArgsFunction = componentCompletionFunc
+
+	// Flag completion for --source
+	installCmd.RegisterFlagCompletionFunc("source", sourceCompletionFunc)
+	updateCmd.RegisterFlagCompletionFunc("source", sourceCompletionFunc)
+
+	// source command arg completion
+	sourceCmd.ValidArgs = []string{"github", "atomgit"}
 }
 
 func listComponents() {
@@ -206,4 +218,19 @@ func setSource(source string) {
 	}
 	fmt.Printf("Default repository source set to: %s\n", source)
 	fmt.Printf("Config saved to: %s\n", configFile)
+}
+
+// componentCompletionFunc provides dynamic completion for component names
+func componentCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	components := component.ListComponents()
+	names := make([]string, len(components))
+	for i, c := range components {
+		names[i] = c.Name
+	}
+	return names, cobra.ShellCompDirectiveNoFileComp
+}
+
+// sourceCompletionFunc provides completion for --source flag values
+func sourceCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{"auto", "github", "atomgit"}, cobra.ShellCompDirectiveNoFileComp
 }

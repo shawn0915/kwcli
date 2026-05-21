@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/shawn0915/kwcli/pkg/config"
+	"github.com/shawn0915/kwcli/pkg/output"
 	"github.com/shawn0915/kwcli/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -168,6 +169,19 @@ func init() {
 	kwdbConfigCmd.AddCommand(kwdbConfigPathCmd)
 
 	kwdbInstallCmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "Use default configuration without prompting")
+
+	// Arg completion for kwdb config set <key>
+	kwdbConfigSetCmd.ValidArgsFunction = kwdbConfigKeyCompletionFunc
+
+	// Flag completion for --non-interactive
+	kwdbInstallCmd.RegisterFlagCompletionFunc("non-interactive", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false"}, cobra.ShellCompDirectiveNoFileComp
+	})
+}
+
+// kwdbConfigKeyCompletionFunc provides completion for kwdb config set keys
+func kwdbConfigKeyCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{"mode", "http-port", "sql-port", "data-dir", "cache", "max-sql-memory"}, cobra.ShellCompDirectiveNoFileComp
 }
 
 func installKWDB() {
@@ -437,6 +451,20 @@ func statusKWDB() {
 		if runtimeCmd == "" {
 			runtimeCmd = "docker"
 		}
+
+		if output.JSONOutput {
+			cmd := exec.Command(runtimeCmd, "ps", "--all", "--filter", "name=^/kwdb$", "--format", "{{.Status}}")
+			statusOutput, _ := cmd.Output()
+			statusStr := strings.TrimSpace(string(statusOutput))
+			running := strings.Contains(statusStr, "Up")
+			output.PrintJSON("kwdb status", map[string]interface{}{
+				"mode":    "docker",
+				"running": running,
+				"status":  statusStr,
+			}, nil)
+			return
+		}
+
 		cmd := exec.Command(runtimeCmd, "ps", "--all", "--filter", "name=^/kwdb$")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -447,15 +475,34 @@ func statusKWDB() {
 	// Check Binary mode
 	binaryMarker := installDir + "/.binary_mode"
 	if _, err := os.Stat(binaryMarker); err == nil {
-		fmt.Println("Checking KWDB (binary mode) status...")
 		cmd := exec.Command("pgrep", "-a", "kwbase")
-		output, _ := cmd.Output()
-		if len(output) > 0 {
+		pgrepOutput, _ := cmd.Output()
+		running := len(pgrepOutput) > 0
+
+		if output.JSONOutput {
+			output.PrintJSON("kwdb status", map[string]interface{}{
+				"mode":    "binary",
+				"running": running,
+				"process": strings.TrimSpace(string(pgrepOutput)),
+			}, nil)
+			return
+		}
+
+		fmt.Println("Checking KWDB (binary mode) status...")
+		if running {
 			fmt.Println("KWDB is running:")
-			fmt.Println(string(output))
+			fmt.Println(string(pgrepOutput))
 		} else {
 			fmt.Println("KWDB is not running.")
 		}
+		return
+	}
+
+	if output.JSONOutput {
+		output.PrintJSON("kwdb status", map[string]interface{}{
+			"mode":    "none",
+			"running": false,
+		}, nil)
 		return
 	}
 
@@ -472,6 +519,22 @@ func logsKWDB() {
 		if runtimeCmd == "" {
 			runtimeCmd = "docker"
 		}
+
+		if output.JSONOutput {
+			// For JSON output, capture recent logs instead of streaming
+			cmd := exec.Command(runtimeCmd, "logs", "--tail", "100", "kwdb")
+			logOutput, err := cmd.CombinedOutput()
+			logLines := strings.Split(strings.TrimSpace(string(logOutput)), "\n")
+			if len(logLines) > 50 {
+				logLines = logLines[len(logLines)-50:]
+			}
+			output.PrintJSON("kwdb logs", map[string]interface{}{
+				"mode": "docker",
+				"logs": logLines,
+			}, err)
+			return
+		}
+
 		cmd := exec.Command(runtimeCmd, "logs", "-f", "kwdb")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -487,6 +550,14 @@ func logsKWDB() {
 		if err == nil && cfg.LogDir != "" {
 			logFiles, _ := filepath.Glob(filepath.Join(cfg.LogDir, "*.log"))
 			if len(logFiles) > 0 {
+				if output.JSONOutput {
+					output.PrintJSON("kwdb logs", map[string]interface{}{
+						"mode":      "binary",
+						"log_dir":   cfg.LogDir,
+						"log_files": logFiles,
+					}, nil)
+					return
+				}
 				fmt.Printf("Found logs in %s:\n", cfg.LogDir)
 				for _, f := range logFiles {
 					if len(logFiles) > 5 {
@@ -501,14 +572,30 @@ func logsKWDB() {
 
 		// Show process info as fallback
 		cmd := exec.Command("pgrep", "-a", "kwbase")
-		output, _ := cmd.Output()
-		if len(output) > 0 {
+		pgrepOutput, _ := cmd.Output()
+		if output.JSONOutput {
+			output.PrintJSON("kwdb logs", map[string]interface{}{
+				"mode":    "binary",
+				"running": len(pgrepOutput) > 0,
+				"message": "No log files found in data directory",
+			}, nil)
+			return
+		}
+		if len(pgrepOutput) > 0 {
 			fmt.Println("KWDB is running but no log files found in data directory.")
 			fmt.Println("Process info:")
-			fmt.Println(string(output))
+			fmt.Println(string(pgrepOutput))
 		} else {
 			fmt.Println("KWDB is not running.")
 		}
+		return
+	}
+
+	if output.JSONOutput {
+		output.PrintJSON("kwdb logs", map[string]interface{}{
+			"mode":    "none",
+			"running": false,
+		}, nil)
 		return
 	}
 

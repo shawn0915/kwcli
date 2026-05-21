@@ -674,4 +674,17 @@ func init() {
 	TSBSCleanCmd.Flags().Int("port", 26257, "KWDB port")
 	TSBSCleanCmd.Flags().String("user", "root", "KWDB user")
 	TSBSCleanCmd.Flags().String("database", "benchmark", "Database name")
+
+	// Flag completion for --use-case
+	TSBSInitCmd.RegisterFlagCompletionFunc("use-case", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"cpu-only", "cpu-single", "devops", "iot", "devops-generic"}, cobra.ShellCompDirectiveNoFileComp
+	})
+	TSBSListCmd.RegisterFlagCompletionFunc("use-case", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"cpu", "iot"}, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	// Flag completion for --insert-type
+	TSBSLoadCmd.RegisterFlagCompletionFunc("insert-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"insert", "prepare", "prepareiot"}, cobra.ShellCompDirectiveNoFileComp
+	})
 }

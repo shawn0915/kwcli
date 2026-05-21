@@ -10,6 +10,7 @@ kwcli.exe
 *.dylib
 
 # Test binary
+tmp
 *.test
 
 # Output of the go coverage tool
@@ -24,6 +25,7 @@ go.work
 *.swp
 *.swo
 *~
+.atomcode
 
 # OS
 .DS_Store

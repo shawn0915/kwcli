@@ -1,10 +1,10 @@
 # KWCLI
 
-[![Version](https://img.shields.io/badge/version-v0.1.1-blue)](https://github.com/shawn0915/kwcli)
+[![Version](https://img.shields.io/badge/version-v0.1.2-blue)](https://github.com/shawn0915/kwcli)
 
 KWCLI 是 KWDB 生态的命令行工具，采用组件化架构设计，帮助你一键安装、运行和管理 KWDB 相关组件。
 
-**当前版本**：v0.1.1  
+**当前版本**：v0.1.2  
 **开发语言**：Go (v1.25+)
 
 ## 特性
@@ -17,7 +17,11 @@ KWCLI 是 KWDB 生态的命令行工具，采用组件化架构设计，帮助�
 - ⚙️ **全局配置**：支持一键切换默认代码源和镜像源
 - 📊 **SampleDB**：内置智能电表模型，一键初始化 schema、生成数据、运行场景查询
 - 📈 **TSBS 基准测试**：内置 KWDB 时序数据库性能测试工具，无需额外安装
-
+- 🔍 **数据库巡检**：一键健康检查，输出 Markdown / JSON / HTML 报告
+- ⚡ **性能快照**：实时采集 QPS/TPS、连接数、慢查询等性能指标
+- 📐 **Schema 导出**：导出数据库 DDL 或 JSON 格式的表结构、索引、标签信息
+- 📤 **查询结果导出**：SQL 查询结果支持 CSV / JSON 导出
+- 🤖 **JSON 输出**：全局 `--json` 标志，所有命令输出可被机器稳定解析
 ## 安装
 
 ### 一键安装（推荐）
@@ -259,6 +263,49 @@ kwcli tsbs clean --drop-db
 | `kwcli sql` | 交互式连接 KWDB |
 | `kwcli sql -e "SELECT 1"` | 执行单条 SQL |
 | `kwcli sql -u <user> -d <db>` | 指定用户和数据库 |
+| `kwcli sql -f init.sql` | 执行 SQL 脚本文件 |
+| `kwcli sql -f migrate.sql --transaction` | 以事务方式执行 SQL 脚本 |
+| `kwcli sql -e "SELECT ..." --export csv --output result.csv` | 导出查询结果为 CSV |
+| `kwcli sql -e "SELECT ..." --export json` | 导出查询结果为 JSON |
+| `kwcli sql -e "SELECT ..." --json` | 以 JSON 格式输出查询结果 |
+
+### Schema 导出
+
+| 命令 | 说明 |
+|------|------|
+| `kwcli schema dump --db rdb --output rdb_schema.sql` | 导出关系库 DDL |
+| `kwcli schema dump --db tsdb --output tsdb_schema.sql` | 导出时序库 DDL |
+| `kwcli schema dump --db all --output full_schema.sql` | 导出所有库 DDL |
+| `kwcli schema dump --db rdb --format json` | 以 JSON 格式导出（含表结构、索引、标签信息） |
+
+### 性能监控
+
+| 命令 | 说明 |
+|------|------|
+| `kwcli perf snapshot` | 采集性能快照（QPS/TPS、连接数、慢查询、存储） |
+| `kwcli perf snapshot --json` | 以 JSON 格式输出性能快照 |
+| `kwcli perf snapshot --output snapshot.json --format json` | 保存性能快照到文件 |
+
+### 数据库巡检
+
+| 命令 | 说明 |
+|------|------|
+| `kwcli inspect run` | 运行标准巡检（6 项检查） |
+| `kwcli inspect run --items status,logs,connections` | 运行指定巡检项 |
+| `kwcli inspect run --output report.md --format markdown` | 输出 Markdown 巡检报告 |
+| `kwcli inspect run --output report.html --format html` | 输出 HTML 巡检报告 |
+| `kwcli inspect run --json` | 以 JSON 格式输出巡检结果 |
+
+**巡检项**：
+
+| 巡检项 | 说明 |
+|--------|------|
+| `status` | 服务状态（KWDB 是否正常运行） |
+| `logs` | 日志异常（ERROR/FATAL 关键字扫描） |
+| `connections` | 连接数（是否接近上限） |
+| `slow_queries` | 慢查询 / 长时间运行查询 |
+| `storage` | 存储空间使用率 |
+| `sampledb` | SampleDB 健康检查 |
 
 ### KWDB 相关
 
@@ -327,6 +374,12 @@ KWCLI 采用组件化架构设计：
 - [x] SampleDB 智能电表模型 (`kwcli sampledb`)
 - [x] TSBS 基准测试工具 (`kwcli tsbs init/load/run/list/clean`)
 - [x] Shell 自动补全 (`kwcli completion [bash|zsh|fish|powershell]`)
+- [x] 全局 JSON 输出模式 (`--json`)
+- [x] Schema 导出 (`kwcli schema dump --db rdb/tsdb/all`)
+- [x] 批量 SQL 执行 (`kwcli sql -f`、`--transaction`)
+- [x] 查询结果导出 (`kwcli sql --export csv/json`)
+- [x] 数据库巡检 (`kwcli inspect run`)
+- [x] 性能快照 (`kwcli perf snapshot`)
 - [ ] 组件清单与版本索引
 - [ ] 离线镜像与私有化部署支持
 - [ ] Homebrew / install.sh 一键安装

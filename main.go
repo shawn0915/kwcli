@@ -1,11 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/shawn0915/kwcli/cmd"
 )
 
 func main() {
 	if err := cmd.Execute(); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 }

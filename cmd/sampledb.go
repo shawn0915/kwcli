@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/shawn0915/kwcli/pkg/output"
 	"github.com/shawn0915/kwcli/pkg/sampledb"
 	"github.com/spf13/cobra"
 )
@@ -22,8 +23,30 @@ var sampledbInitCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		runner, err := sampledb.NewRunner()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			output.PrintError("sampledb init", err)
 			os.Exit(1)
+		}
+
+		if output.JSONOutput {
+			if err := runner.ExecBatch(sampledb.RDBSchema); err != nil {
+				output.PrintJSON("sampledb init", map[string]interface{}{
+					"step":    "rdb",
+					"success": false,
+				}, err)
+				os.Exit(1)
+			}
+			if err := runner.ExecBatch(sampledb.TSDBSchema); err != nil {
+				output.PrintJSON("sampledb init", map[string]interface{}{
+					"step":    "tsdb",
+					"success": false,
+				}, err)
+				os.Exit(1)
+			}
+			output.PrintJSON("sampledb init", map[string]interface{}{
+				"steps":   []string{"rdb", "tsdb"},
+				"success": true,
+			}, nil)
+			return
 		}
 
 		fmt.Println("Creating databases and tables...")
@@ -50,8 +73,30 @@ var sampledbGenerateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		runner, err := sampledb.NewRunner()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			output.PrintError("sampledb generate", err)
 			os.Exit(1)
+		}
+
+		if output.JSONOutput {
+			if err := runner.ExecBatch(sampledb.GenerateRDBData()); err != nil {
+				output.PrintJSON("sampledb generate", map[string]interface{}{
+					"step":    "rdb_data",
+					"success": false,
+				}, err)
+				os.Exit(1)
+			}
+			if err := runner.ExecBatch(sampledb.GenerateTSDBData()); err != nil {
+				output.PrintJSON("sampledb generate", map[string]interface{}{
+					"step":    "tsdb_data",
+					"success": false,
+				}, err)
+				os.Exit(1)
+			}
+			output.PrintJSON("sampledb generate", map[string]interface{}{
+				"steps":   []string{"rdb_data", "tsdb_data"},
+				"success": true,
+			}, nil)
+			return
 		}
 
 		fmt.Println("Generating sample data...")
@@ -72,136 +117,162 @@ var sampledbGenerateCmd = &cobra.Command{
 	},
 }
 
-var sampledbListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all available scenario queries",
-	Run: func(cmd *cobra.Command, args []string) {
-		category, _ := cmd.Flags().GetString("category")
-
-		var filteredScenarios []sampledb.Scenario
-		if category != "" {
-			for _, s := range sampledb.AllScenarios {
-				if s.Category == category {
-					filteredScenarios = append(filteredScenarios, s)
-				}
-			}
-			if len(filteredScenarios) == 0 {
-				fmt.Printf("No scenarios found for category: %s\n", category)
-				fmt.Println("Available categories: basic, cross-mode, window")
-				return
-			}
-		} else {
-			filteredScenarios = sampledb.AllScenarios
-		}
-
-		fmt.Println("Available Smart Meter Scenarios:")
-		if category != "" {
-			fmt.Printf("(Category: %s)\n", category)
-		}
-		fmt.Println(strings.Repeat("-", 60))
-		for i, s := range filteredScenarios {
-			fmt.Printf("  %2d. %-25s [%s] %s\n", i+1, s.Name, s.Category, s.Title)
-			fmt.Printf("      %s\n", s.Description)
-		}
-		fmt.Println()
-		fmt.Println("Run a scenario:")
-		fmt.Println("  kwcli sampledb run <name>")
-		fmt.Println("  kwcli sampledb run --all")
-		fmt.Println()
-		fmt.Println("Filter by category:")
-		fmt.Println("  kwcli sampledb list --category basic")
-		fmt.Println("  kwcli sampledb list --category cross-mode")
-		fmt.Println("  kwcli sampledb list --category window")
-	},
-}
-
 var sampledbRunAll bool
 
 var sampledbRunCmd = &cobra.Command{
-	Use:   "run <scenario-name>",
-	Short: "Run a scenario query",
-	Long:  "Run a specific scenario query by name, or use --all to run all scenarios.",
+	Use:   "run [scenario]",
+	Short: "Run a specific scenario or all scenarios",
+	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		runner, err := sampledb.NewRunner()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			output.PrintError("sampledb run", err)
 			os.Exit(1)
 		}
 
+		var scenarios []sampledb.Scenario
 		if sampledbRunAll {
-			fmt.Println("Running all scenarios...")
-			fmt.Println()
-			for _, s := range sampledb.AllScenarios {
-				fmt.Printf("=== %s ===\n", s.Title)
-				fmt.Printf("-- %s\n", s.Description)
-				fmt.Println()
-				if err := runner.Exec(s.SQL); err != nil {
-					fmt.Printf("Failed to run scenario '%s': %v\n", s.Name, err)
-				}
-				fmt.Println()
+			scenarios = sampledb.AllScenarios
+		} else if len(args) > 0 {
+			s := sampledb.FindScenario(args[0])
+			if s == nil {
+				output.PrintError("sampledb run", fmt.Errorf("scenario not found: %s", args[0]))
+				os.Exit(1)
 			}
+			scenarios = []sampledb.Scenario{*s}
+		} else {
+			fmt.Println("Please specify a scenario name or use --all flag")
+			os.Exit(1)
+		}
+
+		if output.JSONOutput {
+			results := make([]map[string]interface{}, 0, len(scenarios))
+			for _, s := range scenarios {
+				err := runner.Exec(s.SQL)
+				results = append(results, map[string]interface{}{
+					"name":    s.Name,
+					"title":   s.Title,
+					"success": err == nil,
+				})
+			}
+			output.PrintJSON("sampledb run", results, nil)
 			return
 		}
 
-		if len(args) == 0 {
-			fmt.Println("Please specify a scenario name or use --all.")
-			fmt.Println("Run 'kwcli sampledb list' to see available scenarios.")
-			os.Exit(1)
+		for _, s := range scenarios {
+			fmt.Printf("\n=== Running: %s ===\n", s.Title)
+			fmt.Printf("Description: %s\n", s.Description)
+			if err := runner.Exec(s.SQL); err != nil {
+				fmt.Printf("Error: %v\n", err)
+			}
+		}
+	},
+}
+
+var sampledbListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List available scenarios",
+	Run: func(cmd *cobra.Command, args []string) {
+		category, _ := cmd.Flags().GetString("category")
+
+		scenarios := sampledb.AllScenarios
+		if category != "" {
+			var filtered []sampledb.Scenario
+			for _, s := range scenarios {
+				if s.Category == category {
+					filtered = append(filtered, s)
+				}
+			}
+			scenarios = filtered
 		}
 
-		name := args[0]
-		scenario := sampledb.FindScenario(name)
-		if scenario == nil {
-			fmt.Printf("Unknown scenario: %s\n", name)
-			fmt.Println("Run 'kwcli sampledb list' to see available scenarios.")
-			os.Exit(1)
+		if output.JSONOutput {
+			items := make([]map[string]string, 0, len(scenarios))
+			for _, s := range scenarios {
+				items = append(items, map[string]string{
+					"name":        s.Name,
+					"title":       s.Title,
+					"description": s.Description,
+					"category":    s.Category,
+				})
+			}
+			output.PrintJSON("sampledb list", items, nil)
+			return
 		}
 
-		fmt.Printf("=== %s ===\n", scenario.Title)
-		fmt.Printf("-- %s\n", scenario.Description)
-		fmt.Println()
-		if err := runner.Exec(scenario.SQL); err != nil {
-			fmt.Printf("Failed to run scenario: %v\n", err)
-			os.Exit(1)
+		fmt.Println("Available Scenarios:")
+		fmt.Println("====================")
+		currentCategory := ""
+		for _, s := range scenarios {
+			if s.Category != currentCategory {
+				currentCategory = s.Category
+				fmt.Printf("\n[%s]\n", strings.Title(currentCategory))
+			}
+			fmt.Printf("  %-30s %s\n", s.Name, s.Title)
 		}
 	},
 }
 
 var sampledbCleanCmd = &cobra.Command{
 	Use:   "clean",
-	Short: "Clean all SampleDB data (drop databases)",
+	Short: "Remove all sample data",
 	Run: func(cmd *cobra.Command, args []string) {
 		runner, err := sampledb.NewRunner()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			output.PrintError("sampledb clean", err)
 			os.Exit(1)
 		}
 
-		fmt.Println("Cleaning SampleDB data...")
-		fmt.Println("  Dropping tsdb database...")
-		if err := runner.Exec("DROP DATABASE IF EXISTS tsdb CASCADE;"); err != nil {
-			fmt.Printf("Warning: failed to drop tsdb: %v\n", err)
+		cleanSQL := `
+DELETE FROM tsdb.meter_data WHERE 1=1;
+TRUNCATE TABLE rdb.meter_info CASCADE;
+TRUNCATE TABLE rdb.user_info CASCADE;
+TRUNCATE TABLE rdb.area_info CASCADE;
+TRUNCATE TABLE rdb.alarm_rules CASCADE;
+`
+		if output.JSONOutput {
+			if err := runner.ExecBatch(cleanSQL); err != nil {
+				output.PrintJSON("sampledb clean", nil, err)
+				os.Exit(1)
+			}
+			output.PrintJSON("sampledb clean", map[string]interface{}{"success": true}, nil)
+			return
 		}
-		fmt.Println("  Dropping rdb database...")
-		if err := runner.Exec("DROP DATABASE IF EXISTS rdb CASCADE;"); err != nil {
-			fmt.Printf("Warning: failed to drop rdb: %v\n", err)
+
+		fmt.Println("Cleaning sample data...")
+		if err := runner.ExecBatch(cleanSQL); err != nil {
+			fmt.Printf("Failed to clean sample data: %v\n", err)
+			os.Exit(1)
 		}
-		fmt.Println("SampleDB cleaned successfully!")
+		fmt.Println("Sample data cleaned successfully!")
 	},
 }
 
 var sampledbStatusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Check if SampleDB schema and data exist",
+	Short: "Check SampleDB status",
 	Run: func(cmd *cobra.Command, args []string) {
 		runner, err := sampledb.NewRunner()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			output.PrintError("sampledb status", err)
 			os.Exit(1)
 		}
 
-		rdbExists := runner.CheckDatabaseExists("rdb")
-		tsdbExists := runner.CheckDatabaseExists("tsdb")
+		// Check RDB tables
+		rdbResult, _ := runner.ExecCapture("SELECT COUNT(*) FROM rdb.meter_info")
+		rdbExists := strings.Contains(rdbResult, "0") || strings.Contains(rdbResult, "COUNT")
+
+		// Check TSDB tables
+		tsdbResult, _ := runner.ExecCapture("SELECT COUNT(*) FROM tsdb.meter_data")
+		tsdbExists := strings.Contains(tsdbResult, "0") || strings.Contains(tsdbResult, "COUNT")
+
+		if output.JSONOutput {
+			output.PrintJSON("sampledb status", map[string]interface{}{
+				"rdb_exists":  rdbExists,
+				"tsdb_exists": tsdbExists,
+			}, nil)
+			return
+		}
 
 		fmt.Println("SampleDB Status:")
 		fmt.Printf("  rdb  database: %s\n", boolStr(rdbExists, "exists", "not found"))
@@ -233,6 +304,22 @@ func init() {
 	sampledbCmd.AddCommand(sampledbStatusCmd)
 
 	sampledbRunCmd.Flags().BoolVar(&sampledbRunAll, "all", false, "Run all scenarios")
-
 	sampledbListCmd.Flags().StringP("category", "c", "", "Filter scenarios by category (basic, cross-mode, window)")
+
+	// Dynamic completion for sampledb run [scenario]
+	sampledbRunCmd.ValidArgsFunction = sampledbScenarioCompletionFunc
+
+	// Flag completion for --category
+	sampledbListCmd.RegisterFlagCompletionFunc("category", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"basic", "cross-mode", "window"}, cobra.ShellCompDirectiveNoFileComp
+	})
+}
+
+// sampledbScenarioCompletionFunc provides dynamic completion for scenario names
+func sampledbScenarioCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	var names []string
+	for _, s := range sampledb.AllScenarios {
+		names = append(names, s.Name)
+	}
+	return names, cobra.ShellCompDirectiveNoFileComp
 }

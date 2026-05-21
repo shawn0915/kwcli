@@ -65,6 +65,26 @@ func findKwbase(searchDir string) string {
 	return kwbasePath
 }
 
+// ExecCapture executes a single SQL statement and returns the output
+func (r *Runner) ExecCapture(sql string) (string, error) {
+	sql = strings.TrimSpace(sql)
+	if sql == "" {
+		return "", nil
+	}
+
+	if r.dockerMode {
+		args := []string{"exec", "kwdb", "./kwbase", "sql", "--insecure", "-e", sql}
+		cmd := exec.Command("docker", args...)
+		output, err := cmd.CombinedOutput()
+		return string(output), err
+	}
+
+	cmdArgs := []string{"sql", "--insecure", "-e", sql}
+	cmd := exec.Command(r.kwbasePath, cmdArgs...)
+	output, err := cmd.CombinedOutput()
+	return string(output), err
+}
+
 // Exec executes a single SQL statement
 func (r *Runner) Exec(sql string) error {
 	sql = strings.TrimSpace(sql)

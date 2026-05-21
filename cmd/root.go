@@ -5,12 +5,13 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/shawn0915/kwcli/pkg/output"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	version    = "0.1.1"
+	version    = "0.1.2"
 	commitHash = "unknown"
 	buildTime  = "unknown"
 	homeDir    string
@@ -55,6 +56,7 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kwcli/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&homeDir, "home", "", "KWCLI data directory (default is $HOME/.kwcli)")
+	rootCmd.PersistentFlags().BoolVar(&output.JSONOutput, "json", false, "Output in JSON format")
 
 	// Add completion command
 	rootCmd.AddCommand(completionCmd)

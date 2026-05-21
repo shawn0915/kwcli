@@ -156,6 +156,20 @@ func init() {
 	playgroundStartCmd.Flags().Bool("update", false, "Update playground to the latest version before starting")
 	playgroundStartCmd.Flags().StringVar(&playgroundPullSource, "source", "auto", "Image source: auto (try aliyun first, fallback to default), default (Docker Hub), aliyun (Aliyun registry)")
 	playgroundStartCmd.Flags().StringVarP(&playgroundVersion, "version", "v", "", "Playground version to start (e.g., v1.0.0). Uses latest if not specified.")
+
+	// Flag completion for --source
+	playgroundInstallCmd.RegisterFlagCompletionFunc("source", sourceCompletionFunc)
+	playgroundUpgradeCmd.RegisterFlagCompletionFunc("source", sourceCompletionFunc)
+
+	// Flag completion for --registry
+	playgroundUpgradeCmd.RegisterFlagCompletionFunc("registry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"auto", "aliyun", "default"}, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	// Flag completion for start --source
+	playgroundStartCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"auto", "default", "aliyun"}, cobra.ShellCompDirectiveNoFileComp
+	})
 }
 
 func resolveSourceFlag(source string) string {

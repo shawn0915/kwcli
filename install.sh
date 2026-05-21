@@ -166,8 +166,8 @@ main() {
     echo -e "${YELLOW}Checking for latest version...${NC}"
     VERSION=$(get_latest_version)
     if [[ -z "${VERSION}" ]]; then
-        echo -e "${RED}Failed to get latest version. Using default: 0.1.1${NC}"
-        VERSION="0.1.1"
+        echo -e "${RED}Failed to get latest version. Using default: 0.1.2${NC}"
+        VERSION="0.1.2"
     fi
     echo -e "${GREEN}Latest version: ${VERSION}${NC}"
     
