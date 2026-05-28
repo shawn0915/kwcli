@@ -331,7 +331,81 @@ kwcli tsbs clean --drop-db
 | `kwcli update <component>` | 升级指定组件（支持 `--source`） |
 | `kwcli uninstall <component>` | 卸载指定组件 |
 | `kwcli status` | 查看所有运行中的组件 |
+| `kwcli source [github\|atomgit]` | 设置/查看默认代码源 |
+| `kwcli completion [bash\|zsh\|fish\|powershell]` | 生成 Shell 自动补全脚本 |
+| `kwcli config set <key> <value>` | 设置配置值（如 `llm.provider openai`） |
+| `kwcli config show [key]` | 查看当前配置 |
 
+### Skill 管理
+
+| 命令 | 说明 |
+|------|------|
+| `kwcli skill list` | 列出已安装的 Skills |
+| `kwcli skill install <name>` | 安装 Skill（从 GitHub/AtomGit） |
+| `kwcli skill install <name> --version v1.0.1` | 安装指定版本的 Skill |
+| `kwcli skill install <name> --source github` | 从指定源安装 Skill |
+| `kwcli skill update <name>` | 更新 Skill 至最新版本 |
+| `kwcli skill uninstall <name>` | 卸载 Skill |
+| `kwcli skill info <name>` | 查看 Skill 详情 |
+| `kwcli skill scenarios <name>` | 查看 Skill 支持的场景/命令模板 |
+| `kwcli skill preview <name> --ref <file>` | 预览 Skill 参考文件 |
+| `kwcli skill link <name> --agent claude` | 将 Skill 桥接到 AI Agent（支持 claude, codex, openclaw, kimi） |
+
+**Skill 存储位置**：`~/.kwcli/skills/<name>/`
+
+每个 Skill 包含：
+- `skill.yaml` - 元数据（名称、版本、描述、触发条件、参考文件列表、命令模板）
+- `README.md` - 使用说明
+- `references/` - 参考文件目录（DDL、降采样、插值等知识文档）
+
+### MCP Server
+
+MCP (Model Context Protocol) 服务器，将 kwcli 暴露为 AI Agent 的工具集。
+
+| 命令 | 说明 |
+|------|------|
+| `kwcli mcp serve` | 启动 stdio 模式 MCP 服务器（本地 Agent 调用） |
+| `kwcli mcp serve --transport sse --port 8080` | 启动 SSE 模式 MCP 服务器（远程 Agent 连接） |
+| `kwcli mcp tools` | 列出暴露的工具清单 |
+
+**可用的 MCP 工具**：
+
+| 工具 | 说明 |
+|------|------|
+| `kwcli_sql_exec` | 执行 KWDB SQL 查询 |
+| `kwcli_schema_dump` | 导出数据库 Schema |
+| `kwcli_status` | 获取 KWDB 服务状态 |
+| `kwcli_logs` | 获取 KWDB 日志 |
+| `kwcli_tsbs_run` | 运行 TSBS 基准测试 |
+| `kwcli_sampledb_init` | 初始化 SampleDB |
+| `kwcli_skill_list` | 列出已安装的 Skills |
+| `kwcli_skill_info` | 获取 Skill 详情 |
+| `kwcli_perf_snapshot` | 收集性能快照 |
+| `kwcli_inspect_run` | 运行数据库巡检 |
+
+### AI 模式
+
+AI 助手模式，支持自然语言交互操作 KWDB。
+
+| 命令 | 说明 |
+|------|------|
+| `kwcli ai "查询最近一小时温度超过 40 度的设备"` | 单次提问模式 |
+| `kwcli ai --skill kwdb-text2sql-aiot "分析性能瓶颈"` | 指定 Skill |
+| `kwcli ai --dry-run "创建时序库 iot_db"` | 只生成命令不执行 |
+| `kwcli ai --interactive` | 多轮对话模式 |
+| `kwcli config set llm.provider openai` | 配置 LLM 提供商 |
+| `kwcli config set llm.api_key sk-...` | 配置 API Key |
+| `kwcli config set llm.model gpt-4.1` | 配置模型 |
+| `kwcli config set llm.base_url https://api.openai.com/v1` | 配置 API 地址 |
+| `kwcli config show llm` | 查看当前 LLM 配置 |
+
+**支持的 LLM 提供商**：`openai`, `deepseek`
+
+**护栏设计（安全保障）**：
+- Schema 发现优先：执行 SQL 前先获取真实表结构
+- 读写分离：SELECT/SHOW/EXPLAIN 直接执行；INSERT/CREATE/ALTER/DROP 需用户确认
+- 失败不自动重试：执行失败后读取日志，报告原因，不擅自重试
+- 参数不猜测：端口、IP、目录等必须由用户确认
 ## 架构简介
 
 KWCLI 采用组件化架构设计：
@@ -348,8 +422,13 @@ KWCLI 采用组件化架构设计：
 │   ├── playground/
 │   │   └── versions/    # 多版本共存
 │   └── kwdb/            # KWDB 安装目录
+├── skills/              # KWDB Agent Skills 存储目录（新增）
+│   └── kwdb-text2sql-aiot/
+│       ├── skill.yaml   # 元数据
+│       ├── README.md
+│       └── references/  # 参考文件（DDL、降采样等）
 ├── data/                # 运行时数据
-└── config.yaml          # 全局配置（代码源等）
+└── config.yaml          # 全局配置（代码源、LLM、MCP 等）
 ```
 
 ## 依赖要求
@@ -380,6 +459,10 @@ KWCLI 采用组件化架构设计：
 - [x] 查询结果导出 (`kwcli sql --export csv/json`)
 - [x] 数据库巡检 (`kwcli inspect run`)
 - [x] 性能快照 (`kwcli perf snapshot`)
+- [x] Skill 管理 (`kwcli skill install/list/update/uninstall/info/scenarios/preview/link`)
+- [x] MCP Server (`kwcli mcp serve`，支持 stdio 和 SSE 模式)
+- [x] AI 模式 (`kwcli ai`，支持单次提问、多轮对话、dry-run)
+- [x] LLM 配置 (`kwcli config set llm.*`)
 - [ ] 组件清单与版本索引
 - [ ] 离线镜像与私有化部署支持
 - [ ] Homebrew / install.sh 一键安装

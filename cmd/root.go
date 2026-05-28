@@ -109,6 +109,7 @@ func ensureDirs() {
 		homeDir + "/components",
 		homeDir + "/data",
 		homeDir + "/bin",
+		homeDir + "/skills",
 	}
 	for _, dir := range dirs {
 		os.MkdirAll(dir, 0755)
